@@ -54,6 +54,9 @@ export const deletePost = (id) => api.delete(`/posts/${id}`);
 export const createStory = (data) => api.post("/stories", data);
 export const getStories = () => api.get("/stories");
 export const viewStory = (id) => api.post(`/stories/${id}/view`);
+export const getStoryViewers = (id) => api.get(`/stories/${id}/viewers`);
+export const reactToStory   = (id, emoji) => api.post(`/stories/${id}/react`, { emoji });
+export const commentOnStory = (id, text)  => api.post(`/stories/${id}/comment`, { text });
 
 // Reels
 export const createReel = (data) => api.post("/reels", data);

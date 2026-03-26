@@ -56,3 +56,71 @@ exports.viewStory = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.getStoryViewers = async (req, res) => {
+  try {
+    const story = await Story.findById(req.params.id)
+      .populate("viewers", "username avatar name")
+      .populate("reactions.user", "username avatar")
+      .populate("comments.user", "username avatar");
+    if (!story) return res.status(404).json({ message: "Story not found" });
+    if (story.user.toString() !== req.user._id.toString())
+      return res.status(403).json({ message: "Not your story" });
+    res.json({
+      viewers:   story.viewers,
+      reactions: story.reactions,
+      comments:  story.comments,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.reactToStory = async (req, res) => {
+  try {
+    const { emoji } = req.body;
+    const story = await Story.findById(req.params.id);
+    if (!story) return res.status(404).json({ message: "Story not found" });
+
+    // Remove existing reaction from this user, then add new
+    story.reactions = story.reactions.filter(r => r.user.toString() !== req.user._id.toString());
+    if (emoji) story.reactions.push({ user: req.user._id, emoji });
+    await story.save();
+
+    // Notify story owner via socket
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+    const sid = onlineUsers?.get(story.user.toString());
+    if (sid) io.to(sid).emit("storyReaction", { storyId: story._id, user: req.user, emoji });
+
+    res.json({ message: "Reacted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.commentOnStory = async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ message: "Text required" });
+    const story = await Story.findById(req.params.id);
+    if (!story) return res.status(404).json({ message: "Story not found" });
+
+    story.comments.push({ user: req.user._id, text: text.trim() });
+    await story.save();
+
+    const populated = await Story.findById(story._id)
+      .populate("comments.user", "username avatar");
+    const newComment = populated.comments[populated.comments.length - 1];
+
+    // Notify story owner via socket
+    const io = req.app.get("io");
+    const onlineUsers = req.app.get("onlineUsers");
+    const sid = onlineUsers?.get(story.user.toString());
+    if (sid) io.to(sid).emit("storyComment", { storyId: story._id, comment: newComment, sender: req.user });
+
+    res.json(newComment);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
