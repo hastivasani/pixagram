@@ -3,7 +3,7 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   server: {
     host: true,
     port: 5173,
@@ -23,18 +23,16 @@ export default defineConfig({
     },
   },
   plugins: [
-    basicSsl(),
+    ...(command === 'serve' ? [basicSsl()] : []),
     react(),
-    babel({ presets: [reactCompilerPreset()] })
+    babel({ presets: [reactCompilerPreset()] }),
   ],
   build: {
-    chunkSizeWarningLimit: 1000,
-    minify: 'esbuild',
+    chunkSizeWarningLimit: 1500,
     target: 'es2020',
   },
   optimizeDeps: {
     include: ['deepar', 'three', '@tensorflow-models/body-pix'],
     exclude: ['@mediapipe/face_detection', '@mediapipe/camera_utils'],
-    esbuildOptions: { target: 'es2020' },
   },
-})
+}))
