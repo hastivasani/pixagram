@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect, useCallback } from "react";
+import { createContext, useState, useContext, useEffect, useCallback, useMemo } from "react";
 import { getFeed, getStories, getReels } from "../services/api";
 import { useAuth } from "./AuthContext";
 import { getSocket } from "../utils/socket";
@@ -145,14 +145,16 @@ export function ContentProvider({ children }) {
     };
   }, [user?._id]);
 
+  const contextValue = useMemo(() => ({
+    posts, stories, reels,
+    loadingPosts, hasMore,
+    fetchFeed, fetchStories, fetchReels, loadMoreFeed,
+    prependPost,
+    setPosts, setStories, setReels,
+  }), [posts, stories, reels, loadingPosts, hasMore, fetchFeed, fetchStories, fetchReels, loadMoreFeed]);
+
   return (
-    <ContentContext.Provider value={{
-      posts, stories, reels,
-      loadingPosts, hasMore,
-      fetchFeed, fetchStories, fetchReels, loadMoreFeed,
-      prependPost,
-      setPosts, setStories, setReels,
-    }}>
+    <ContentContext.Provider value={contextValue}>
       {children}
     </ContentContext.Provider>
   );

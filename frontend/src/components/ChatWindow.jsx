@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import EmojiPicker from "emoji-picker-react";
+import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
 import {
   HiEmojiHappy,
   HiPhotograph,
@@ -26,10 +26,10 @@ export default function ChatWindow({ chat, onBack }) {
   const messagesEndRef = useRef(null);
   const fileRef = useRef(null);
 
-  const av = (u) =>
-    u && u.avatar
-      ? u.avatar
-      : "https://ui-avatars.com/api/?name=" + (u && u.username ? u.username : "U");
+  const av = useCallback((u) =>
+    u?.avatar || `https://ui-avatars.com/api/?name=${u?.username || "U"}`, []);
+
+  const chatAvatar = useMemo(() => av(chat), [chat?.avatar, chat?.username]);
 
   useEffect(() => {
     if (!chat || !chat._id) return;
@@ -53,11 +53,14 @@ export default function ChatWindow({ chat, onBack }) {
     return () => socket.off("newMessage", onMsg);
   }, [user && user._id, chat && chat._id]);
 
+  // Scroll to bottom only when new message added, not on every render
+  const prevMsgCount = useRef(0);
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > prevMsgCount.current && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: prevMsgCount.current === 0 ? "instant" : "smooth" });
     }
-  }, [messages]);
+    prevMsgCount.current = messages.length;
+  }, [messages.length]);
 
   const handleSend = async () => {
     if (!text.trim() && !imageFile) return;
@@ -112,9 +115,11 @@ export default function ChatWindow({ chat, onBack }) {
             </button>
           )}
           <img
-            src={av(chat)}
+            src={chatAvatar}
             className="w-10 h-10 rounded-full object-cover flex-shrink-0"
             alt=""
+            loading="lazy"
+            decoding="async"
           />
           <div className="min-w-0">
             <p className="font-semibold text-theme-primary text-sm truncate">
@@ -149,9 +154,10 @@ export default function ChatWindow({ chat, onBack }) {
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-theme-muted">
             <img
-              src={av(chat)}
+              src={chatAvatar}
               className="w-16 h-16 rounded-full object-cover"
               alt=""
+              loading="lazy"
             />
             <p className="font-semibold text-theme-primary">
               {chat && chat.username}
@@ -169,9 +175,10 @@ export default function ChatWindow({ chat, onBack }) {
             >
               {!mine && (
                 <img
-                  src={av(chat)}
+                  src={chatAvatar}
                   className="w-7 h-7 rounded-full object-cover flex-shrink-0"
                   alt=""
+                  loading="lazy"
                 />
               )}
               <div className={"max-w-[65%] flex flex-col " + (mine ? "items-end" : "items-start")}>
@@ -192,6 +199,8 @@ export default function ChatWindow({ chat, onBack }) {
                     src={msg.imageUrl}
                     className="mt-1 rounded-xl max-w-[200px]"
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                   />
                 )}
                 <span className="text-[10px] text-theme-muted mt-0.5">
@@ -207,13 +216,12 @@ export default function ChatWindow({ chat, onBack }) {
       {/* Emoji picker */}
       {showEmoji && (
         <div className="absolute bottom-20 left-4 z-10">
-          <EmojiPicker
-            onEmojiClick={(e) => {
-              setText((p) => p + e.emoji);
-              setShowEmoji(false);
-            }}
-            height={350}
-          />
+          <Suspense fallback={<div className="w-[300px] h-[350px] bg-theme-card rounded-xl animate-pulse" />}>
+            <EmojiPicker
+              onEmojiClick={(e) => { setText((p) => p + e.emoji); setShowEmoji(false); }}
+              height={350}
+            />
+          </Suspense>
         </div>
       )}
 

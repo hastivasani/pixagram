@@ -27,18 +27,25 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor':  ['react', 'react-dom', 'react-router-dom'],
+          'socket':  ['socket.io-client'],
+          'icons':   ['react-icons'],
+          'emoji':   ['emoji-picker-react'],
+          'media':   ['deepar', 'three'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+    minify: 'esbuild',
+    target: 'es2020',
+  },
   optimizeDeps: {
-    include: [
-      'deepar',
-      'three',
-      '@tensorflow-models/body-pix'
-    ],
-    exclude: [
-      '@mediapipe/face_detection',
-      '@mediapipe/camera_utils'
-    ],
-    esbuildOptions: {
-      target: 'es2020'
-    }
-  }
+    include: ['deepar', 'three', '@tensorflow-models/body-pix'],
+    exclude: ['@mediapipe/face_detection', '@mediapipe/camera_utils'],
+    esbuildOptions: { target: 'es2020' },
+  },
 })

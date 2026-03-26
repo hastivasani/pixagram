@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useCallback, useMemo, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   HiHeart, HiOutlineHeart,
@@ -13,18 +13,18 @@ import { useContent } from "../Context/ContentContext";
 
 const timeAgo = (date) => {
   const s = Math.floor((Date.now() - new Date(date)) / 1000);
-  if (s < 60)  return "Just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 60)   return "Just now";
+  if (s < 3600)  return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
   return `${Math.floor(s / 86400)}d`;
 };
 
-const avatar = (u) =>
+const getAvatar = (u) =>
   u?.avatar || `https://ui-avatars.com/api/?name=${u?.username || "U"}&background=random`;
 
-export default function PostCard({ post }) {
+const PostCard = memo(function PostCard({ post }) {
   const navigate = useNavigate();
-  const { user }    = useAuth();
+  const { user }     = useAuth();
   const { setPosts } = useContent();
 
   const [likes,        setLikes]        = useState(post.likes || []);
@@ -35,16 +35,18 @@ export default function PostCard({ post }) {
   const [saved,        setSaved]        = useState(false);
   const [shared,       setShared]       = useState(false);
 
-  const isLiked = user && likes.some((id) => (id?._id || id) === user._id);
-  const isOwner = user && post.user?._id === user._id;
+  const isLiked = useMemo(() => user && likes.some((id) => (id?._id || id) === user._id), [likes, user]);
+  const isOwner = useMemo(() => user && post.user?._id === user._id, [user, post.user?._id]);
+  const postAvatar  = useMemo(() => getAvatar(post.user),  [post.user?.avatar, post.user?.username]);
+  const userAvatar  = useMemo(() => getAvatar(user),       [user?.avatar, user?.username]);
 
-  const handleLike = async () => {
+  const handleLike = useCallback(async () => {
     setLikes((p) => isLiked ? p.filter((id) => (id?._id || id) !== user._id) : [...p, user._id]);
     try { const r = await likePost(post._id); setLikes(r.data.likes); }
     catch (e) { console.error(e); }
-  };
+  }, [isLiked, user?._id, post._id]);
 
-  const handleComment = async (e) => {
+  const handleComment = useCallback(async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
     try {
@@ -52,26 +54,30 @@ export default function PostCard({ post }) {
       setComments((p) => [...p, r.data]);
       setCommentText("");
     } catch (e) { console.error(e); }
-  };
+  }, [commentText, post._id]);
 
-  const handleShare = () => {
+  const handleShare = useCallback(() => {
     navigator.clipboard.writeText(`${window.location.origin}/profile/${post.user?.username}`);
     setShared(true);
     setTimeout(() => setShared(false), 2000);
-  };
+  }, [post.user?.username]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!window.confirm("Delete this post?")) return;
     try {
       await deletePost(post._id);
       setPosts((p) => p.filter((x) => x._id !== post._id));
     } catch (e) { console.error(e); }
-  };
+  }, [post._id, setPosts]);
+
+  const toggleComments = useCallback(() => setShowComments((s) => !s), []);
+  const toggleMenu     = useCallback(() => setShowMenu((s) => !s),     []);
+  const toggleSaved    = useCallback(() => setSaved((s) => !s),        []);
 
   return (
     <article className="w-full bg-theme-card border border-theme rounded-2xl overflow-hidden shadow-theme">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5">
         <button
           onClick={() => navigate(`/profile/${post.user?.username}`)}
@@ -79,9 +85,11 @@ export default function PostCard({ post }) {
         >
           <div className="p-0.5 rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0">
             <img
-              src={avatar(post.user)}
+              src={postAvatar}
               className="w-8 h-8 rounded-full object-cover border-2 border-white dark:border-gray-900"
               alt={post.user?.username}
+              loading="lazy"
+              decoding="async"
             />
           </div>
           <div className="text-left min-w-0">
@@ -92,13 +100,9 @@ export default function PostCard({ post }) {
           </div>
         </button>
 
-        {/* 3-dot menu — owner only */}
         {isOwner && (
           <div className="relative flex-shrink-0">
-            <button
-              onClick={() => setShowMenu((s) => !s)}
-              className="p-2 rounded-full hover:bg-theme-hover transition text-theme-muted"
-            >
+            <button onClick={toggleMenu} className="p-2 rounded-full hover:bg-theme-hover transition text-theme-muted">
               <HiDotsHorizontal size={20} />
             </button>
             {showMenu && (
@@ -118,12 +122,13 @@ export default function PostCard({ post }) {
         )}
       </div>
 
-      {/* ── Media ── */}
+      {/* Media */}
       <div className="w-full bg-black">
         {post.mediaType === "video" ? (
           <video
             src={post.mediaUrl}
             controls
+            preload="metadata"
             className="w-full max-h-[600px] object-contain"
           />
         ) : (
@@ -132,101 +137,58 @@ export default function PostCard({ post }) {
             alt={post.caption || "post"}
             className="w-full max-h-[600px] object-cover"
             loading="lazy"
+            decoding="async"
           />
         )}
       </div>
 
-      {/* ── Actions ── */}
+      {/* Actions */}
       <div className="px-3 pt-2.5 pb-1">
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-3.5">
-            {/* Like */}
-            <button
-              onClick={handleLike}
-              className="transition-transform active:scale-125 hover:opacity-70"
-              aria-label={isLiked ? "Unlike" : "Like"}
-            >
-              {isLiked
-                ? <HiHeart className="w-7 h-7 text-red-500" />
-                : <HiOutlineHeart className="w-7 h-7 text-theme-primary" />
-              }
+            <button onClick={handleLike} className="transition-transform active:scale-125 hover:opacity-70" aria-label={isLiked ? "Unlike" : "Like"}>
+              {isLiked ? <HiHeart className="w-7 h-7 text-red-500" /> : <HiOutlineHeart className="w-7 h-7 text-theme-primary" />}
             </button>
-
-            {/* Comment */}
-            <button
-              onClick={() => setShowComments((s) => !s)}
-              className="hover:opacity-70 transition"
-              aria-label="Comment"
-            >
+            <button onClick={toggleComments} className="hover:opacity-70 transition" aria-label="Comment">
               <HiOutlineChat className="w-7 h-7 text-theme-primary" />
             </button>
-
-            {/* Share */}
-            <button
-              onClick={handleShare}
-              className="hover:opacity-70 transition"
-              aria-label="Share"
-            >
-              <HiOutlinePaperAirplane
-                className={`w-6 h-6 ${shared ? "text-green-500" : "text-theme-primary"}`}
-              />
+            <button onClick={handleShare} className="hover:opacity-70 transition" aria-label="Share">
+              <HiOutlinePaperAirplane className={`w-6 h-6 ${shared ? "text-green-500" : "text-theme-primary"}`} />
             </button>
           </div>
-
-          {/* Save */}
-          <button
-            onClick={() => setSaved((s) => !s)}
-            className="hover:opacity-70 transition"
-            aria-label="Save"
-          >
-            {saved
-              ? <HiBookmark className="w-6 h-6 text-theme-primary" />
-              : <HiOutlineBookmark className="w-6 h-6 text-theme-primary" />
-            }
+          <button onClick={toggleSaved} className="hover:opacity-70 transition" aria-label="Save">
+            {saved ? <HiBookmark className="w-6 h-6 text-theme-primary" /> : <HiOutlineBookmark className="w-6 h-6 text-theme-primary" />}
           </button>
         </div>
 
-        {/* Like count */}
         {likes.length > 0 && (
           <p className="text-[13px] font-semibold text-theme-primary mb-1">
             {likes.length.toLocaleString()} {likes.length === 1 ? "like" : "likes"}
           </p>
         )}
 
-        {/* Caption */}
         {post.caption && (
           <p className="text-[13px] text-theme-primary mb-1">
-            <button
-              onClick={() => navigate(`/profile/${post.user?.username}`)}
-              className="font-semibold mr-1 hover:underline"
-            >
+            <button onClick={() => navigate(`/profile/${post.user?.username}`)} className="font-semibold mr-1 hover:underline">
               {post.user?.username}
             </button>
             {post.caption}
           </p>
         )}
 
-        {/* View comments toggle */}
         {comments.length > 0 && !showComments && (
-          <button
-            onClick={() => setShowComments(true)}
-            className="text-[12px] text-theme-muted hover:text-theme-secondary transition mb-1"
-          >
+          <button onClick={() => setShowComments(true)} className="text-[12px] text-theme-muted hover:text-theme-secondary transition mb-1">
             View all {comments.length} comment{comments.length > 1 ? "s" : ""}
           </button>
         )}
       </div>
 
-      {/* ── Comments ── */}
+      {/* Comments */}
       {showComments && (
         <div className="px-3 pb-2 space-y-2 max-h-40 overflow-y-auto scrollbar-hide">
           {comments.map((c, i) => (
             <div key={c._id || i} className="flex items-start gap-2">
-              <img
-                src={avatar(c.user)}
-                className="w-6 h-6 rounded-full object-cover flex-shrink-0 mt-0.5"
-                alt={c.user?.username}
-              />
+              <img src={getAvatar(c.user)} className="w-6 h-6 rounded-full object-cover flex-shrink-0 mt-0.5" alt={c.user?.username} loading="lazy" decoding="async" />
               <p className="text-[13px] text-theme-primary leading-snug">
                 <span className="font-semibold mr-1">{c.user?.username}</span>
                 <span className="text-theme-secondary">{c.text}</span>
@@ -236,16 +198,9 @@ export default function PostCard({ post }) {
         </div>
       )}
 
-      {/* ── Add comment ── */}
-      <form
-        onSubmit={handleComment}
-        className="flex items-center gap-2 px-3 py-2.5 border-t border-theme"
-      >
-        <img
-          src={avatar(user)}
-          className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-          alt={user?.username}
-        />
+      {/* Add comment */}
+      <form onSubmit={handleComment} className="flex items-center gap-2 px-3 py-2.5 border-t border-theme">
+        <img src={userAvatar} className="w-6 h-6 rounded-full object-cover flex-shrink-0" alt={user?.username} loading="lazy" decoding="async" />
         <input
           value={commentText}
           onChange={(e) => setCommentText(e.target.value)}
@@ -253,14 +208,11 @@ export default function PostCard({ post }) {
           className="flex-1 bg-transparent text-[13px] text-theme-primary outline-none placeholder:text-theme-muted"
         />
         {commentText.trim() && (
-          <button
-            type="submit"
-            className="text-blue-500 text-[13px] font-semibold flex-shrink-0"
-          >
-            Post
-          </button>
+          <button type="submit" className="text-blue-500 text-[13px] font-semibold flex-shrink-0">Post</button>
         )}
       </form>
     </article>
   );
-}
+});
+
+export default PostCard;
