@@ -30,12 +30,14 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor':  ['react', 'react-dom', 'react-router-dom'],
-          'socket':  ['socket.io-client'],
-          'icons':   ['react-icons'],
-          'emoji':   ['emoji-picker-react'],
-          'media':   ['deepar', 'three'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('socket.io-client')) return 'socket';
+            if (id.includes('emoji-picker-react')) return 'emoji';
+            if (id.includes('react-icons')) return 'icons';
+            if (id.includes('react-dom') || id.includes('react-router')) return 'vendor';
+            if (id.includes('react')) return 'vendor';
+          }
         },
       },
     },
