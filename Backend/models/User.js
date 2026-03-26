@@ -15,6 +15,16 @@ const userSchema = new mongoose.Schema({
   followRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   isPrivate:      { type: Boolean, default: false },
   blockedUsers:   [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+  notificationSettings: {
+    postLikes:      { type: Boolean, default: true },
+    comments:       { type: Boolean, default: true },
+    followRequests: { type: Boolean, default: true },
+    messages:       { type: Boolean, default: true },
+  },
+  mediaSettings: {
+    autoplayVideos: { type: Boolean, default: true },
+    hdUploads:      { type: Boolean, default: true },
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model("User", userSchema);

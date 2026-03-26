@@ -38,6 +38,8 @@ export const blockUser       = (id) => api.post(`/users/${id}/block`);
 export const getBlockedUsers = ()   => api.get("/users/blocked");
 export const changePassword  = (data) => api.put("/auth/change-password", data);
 export const deleteAccount   = (data) => api.delete("/auth/delete-account", { data });
+export const updateNotificationSettings = (data) => api.put("/users/notification-settings", data);
+export const updateMediaSettings        = (data) => api.put("/users/media-settings", data);
 
 // Posts
 export const createPost = (data) => api.post("/posts", data);

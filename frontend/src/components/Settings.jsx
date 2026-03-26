@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { HiChevronRight, HiArrowLeft } from "react-icons/hi";
 import { useTheme } from "../Context/ThemeContext";
 import { useAuth } from "../Context/AuthContext";
-import { updateProfile, changePassword, deleteAccount, togglePrivacy, getBlockedUsers, blockUser } from "../services/api";
+import { updateProfile, changePassword, deleteAccount, togglePrivacy, getBlockedUsers, blockUser, updateNotificationSettings, updateMediaSettings } from "../services/api";
 
 /* ── Reusable sub-components ─────────────────────────────────── */
 const inputCls = "w-full px-3 py-2.5 border border-theme rounded-xl bg-theme-input text-theme-primary focus:ring-2 focus:ring-blue-500 outline-none text-sm";
@@ -53,6 +53,17 @@ export default function Settings() {
   const [blocked,    setBlocked]    = useState([]);
   const [delPwd,     setDelPwd]     = useState("");
   const [delConfirm, setDelConfirm] = useState(false);
+
+  const [notifSettings, setNotifSettings] = useState({
+    postLikes:      user?.notificationSettings?.postLikes      ?? true,
+    comments:       user?.notificationSettings?.comments       ?? true,
+    followRequests: user?.notificationSettings?.followRequests ?? true,
+    messages:       user?.notificationSettings?.messages       ?? true,
+  });
+  const [mediaSettings, setMediaSettings] = useState({
+    autoplayVideos: user?.mediaSettings?.autoplayVideos ?? true,
+    hdUploads:      user?.mediaSettings?.hdUploads      ?? true,
+  });
 
   useEffect(() => {
     if (user) {
@@ -110,6 +121,20 @@ export default function Settings() {
   const handleTogglePrivacy = async () => {
     try { const r = await togglePrivacy(); setIsPrivate(r.data.isPrivate); await refreshUser(); }
     catch (_) {}
+  };
+
+  const handleNotifToggle = async (key) => {
+    const updated = { ...notifSettings, [key]: !notifSettings[key] };
+    setNotifSettings(updated);
+    try { await updateNotificationSettings(updated); }
+    catch (_) { setNotifSettings(notifSettings); }
+  };
+
+  const handleMediaToggle = async (key) => {
+    const updated = { ...mediaSettings, [key]: !mediaSettings[key] };
+    setMediaSettings(updated);
+    try { await updateMediaSettings(updated); }
+    catch (_) { setMediaSettings(mediaSettings); }
   };
 
   const handleUnblock = async (id) => {
@@ -262,12 +287,12 @@ export default function Settings() {
       case "notifications": return (
         <div>
           {[
-            ["Post likes",      "When someone likes your post",          true],
-            ["Comments",        "When someone comments on your post",     true],
-            ["Follow requests", "When someone sends a follow request",    true],
-            ["Messages",        "When you receive a new message",         false],
-          ].map(([lbl, desc, on]) => (
-            <Row key={lbl} label={lbl} desc={desc} right={<Toggle value={on} onChange={() => {}} />} />
+            ["postLikes",      "Post likes",      "When someone likes your post"],
+            ["comments",       "Comments",        "When someone comments on your post"],
+            ["followRequests", "Follow requests", "When someone sends a follow request"],
+            ["messages",       "Messages",        "When you receive a new message"],
+          ].map(([key, lbl, desc]) => (
+            <Row key={key} label={lbl} desc={desc} right={<Toggle value={notifSettings[key]} onChange={() => handleNotifToggle(key)} />} />
           ))}
         </div>
       );
@@ -275,9 +300,8 @@ export default function Settings() {
       case "your-app-and-media": return (
         <div>
           <Row label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"} right={<Toggle value={isDark} onChange={toggleTheme} />} />
-          {["Archiving and downloading", "Accessibility", "Language"].map(l => (
-            <Row key={l} label={l} onClick={() => {}} />
-          ))}
+          <Row label="Autoplay videos" desc="Automatically play videos as you scroll" right={<Toggle value={mediaSettings.autoplayVideos} onChange={() => handleMediaToggle("autoplayVideos")} />} />
+          <Row label="Upload in HD" desc="Upload photos and videos in higher quality" right={<Toggle value={mediaSettings.hdUploads} onChange={() => handleMediaToggle("hdUploads")} />} />
         </div>
       );
 
@@ -331,7 +355,7 @@ export default function Settings() {
 
   /* ── Render ──────────────────────────────────────────────── */
   return (
-    <div className="bg-theme-primary min-h-screen pb-[68px] md:pb-0">
+    <div className="bg-theme-primary min-h-screen pb-[68px] md:pb-0 overflow-x-hidden">
 
       {/* ── MOBILE: show detail page when section selected ── */}
       {activeSection && (
@@ -426,7 +450,7 @@ export default function Settings() {
               <div className="px-6 py-5 border-b border-theme">
                 <h2 className="text-xl font-bold text-theme-primary">{getSectionTitle(activeSection)}</h2>
               </div>
-              <div className="max-w-xl py-2">
+              <div className="max-w-xl px-2 py-2">
                 {renderDetail(activeSection)}
               </div>
             </>

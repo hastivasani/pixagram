@@ -260,3 +260,29 @@ exports.getBlockedUsers = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+exports.updateNotificationSettings = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { notificationSettings: req.body },
+      { new: true }
+    ).select("notificationSettings");
+    res.json(user.notificationSettings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.updateMediaSettings = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { mediaSettings: req.body },
+      { new: true }
+    ).select("mediaSettings");
+    res.json(user.mediaSettings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
