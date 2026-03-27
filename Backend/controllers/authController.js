@@ -20,6 +20,8 @@ const formatUser = (user) => ({
 exports.register = async (req, res) => {
   try {
     const { username, email, password, name } = req.body;
+    console.log("[REGISTER] body:", { username, email, name, hasPassword: !!password });
+
     if (!username || !email || !password)
       return res.status(400).json({ message: "All fields required" });
 
@@ -41,6 +43,7 @@ exports.register = async (req, res) => {
 
     res.status(201).json({ token: generateToken(user._id), user: formatUser(user) });
   } catch (err) {
+    console.error("[REGISTER ERROR]", err.message);
     res.status(500).json({ error: err.message });
   }
 };
@@ -52,7 +55,18 @@ exports.login = async (req, res) => {
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(400).json({ message: "Invalid credentials" });
+    if (!match) {
+      // Log failed attempt
+      await User.findByIdAndUpdate(user._id, {
+        $push: { loginActivity: { ip: req.ip, device: req.headers["user-agent"]?.slice(0,100) || "Unknown", success: false } },
+      });
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    // Log successful login
+    await User.findByIdAndUpdate(user._id, {
+      $push: { loginActivity: { ip: req.ip, device: req.headers["user-agent"]?.slice(0,100) || "Unknown", success: true } },
+    });
 
     res.json({ token: generateToken(user._id), user: formatUser(user) });
   } catch (err) {
@@ -63,10 +77,10 @@ exports.login = async (req, res) => {
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
-      .select("-password")
+      .select("-password -loginActivity")
       .populate("followers", "username name avatar")
       .populate("following", "username name avatar");
-    res.json(formatUser(user));
+    res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -5,6 +5,7 @@ import { useAuth } from "../Context/AuthContext";
 import GalleryProfile from "../components/GalleryProfile";
 import FollowListModal from "../components/FollowListModal";
 import { HiDotsHorizontal, HiX } from "react-icons/hi";
+import { FaMusic, FaPlay, FaPause, FaLink } from "react-icons/fa";
 
 function ThreeDotMenu({ onBlock, onShare, onClose }) {
   const menuRef = useRef(null);
@@ -35,6 +36,27 @@ function ThreeDotMenu({ onBlock, onShare, onClose }) {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ProfileMusicPlayer({ musicUrl, musicName, color }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef(null);
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); setPlaying(false); }
+    else { audioRef.current.play(); setPlaying(true); }
+  };
+  return (
+    <div className="flex items-center gap-2 rounded-full px-3 py-1.5 mt-2 w-fit border"
+      style={{ borderColor: color + "66", background: color + "11" }}>
+      <FaMusic style={{ color }} className="text-xs flex-shrink-0" />
+      <span className="text-xs text-theme-secondary truncate max-w-[120px]">{musicName || "Profile Music"}</span>
+      <button onClick={toggle} style={{ color }} className="hover:opacity-70 transition flex-shrink-0">
+        {playing ? <FaPause size={10} /> : <FaPlay size={10} />}
+      </button>
+      <audio ref={audioRef} src={musicUrl} onEnded={() => setPlaying(false)} />
     </div>
   );
 }
@@ -122,11 +144,17 @@ export default function UserProfile() {
 
   const isOwnProfile = me?._id === profileUser._id;
 
+  // Profile theme color
+  const themeColor = profileUser.profileColor || "#a855f7";
+
   return (
     <div className="bg-theme-primary min-h-screen pb-[68px] md:pb-0">
 
+      {/* Themed header banner */}
+      <div className="h-16 w-full"  />
+
       {/* Header section */}
-      <div className="max-w-[935px] mx-auto px-4 pt-8 pb-4">
+      <div className="max-w-[935px] mx-auto px-4 pb-4 -mt-8">
         {/* Top bar */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-base font-semibold text-theme-primary">{profileUser.username}</h2>
@@ -192,6 +220,24 @@ export default function UserProfile() {
             {profileUser.name    && <p className="text-[13px] font-semibold text-theme-primary mb-0.5">{profileUser.name}</p>}
             {profileUser.bio     && <p className="text-[13px] text-theme-secondary mb-1">{profileUser.bio}</p>}
             {profileUser.website && <a href={profileUser.website} target="_blank" rel="noopener noreferrer" className="text-[13px] text-blue-500 hover:underline">{profileUser.website}</a>}
+
+            {/* Bio Links */}
+            {profileUser.bioLinks?.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {profileUser.bioLinks.map((link, i) => (
+                  <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs rounded-full px-2.5 py-1 border transition hover:opacity-80"
+                    style={{ borderColor: themeColor, color: themeColor }}>
+                    <FaLink size={9} /> {link.title || link.url}
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* Profile Music */}
+            {profileUser.profileMusic && (
+              <ProfileMusicPlayer musicUrl={profileUser.profileMusic} musicName={profileUser.profileMusicName} color={themeColor} />
+            )}
           </div>
         </div>
       </div>{/* end max-width header */}

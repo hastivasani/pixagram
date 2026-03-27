@@ -3,21 +3,15 @@ const router  = express.Router();
 const { protect } = require("../middleware/auth");
 const upload      = require("../middleware/upload");
 const {
-  getProfile,
-  updateProfile,
-  followUser,
-  acceptFollow,
-  rejectFollow,
-  getFollowRequests,
-  searchUsers,
-  getSuggestedUsers,
-  getAllUsers,
-  getProfileByUsername,
-  togglePrivacy,
-  blockUser,
-  getBlockedUsers,
-  updateNotificationSettings,
-  updateMediaSettings,
+  getProfile, updateProfile, followUser, acceptFollow, rejectFollow,
+  getFollowRequests, searchUsers, getSuggestedUsers, getAllUsers,
+  getProfileByUsername, togglePrivacy, blockUser, getBlockedUsers,
+  updateNotificationSettings, updateMediaSettings,
+  toggleCloseFriend, getCloseFriends,
+  checkInStreak, generateReferral, useReferral,
+  getCreatorAnalytics, getLoginActivity,
+  updateBioLinks, updateProfileMusic, updateProfileTheme,
+  updateWordFilter, getSavedPosts,
 } = require("../controllers/userController");
 
 router.get("/",                    protect, getAllUsers);
@@ -25,15 +19,27 @@ router.get("/search",              protect, searchUsers);
 router.get("/suggested",           protect, getSuggestedUsers);
 router.get("/follow-requests",     protect, getFollowRequests);
 router.get("/blocked",             protect, getBlockedUsers);
+router.get("/close-friends",       protect, getCloseFriends);
+router.get("/saved-posts",         protect, getSavedPosts);
+router.get("/analytics",           protect, getCreatorAnalytics);
+router.get("/login-activity",      protect, getLoginActivity);
+router.get("/referral",            protect, generateReferral);
 router.get("/username/:username",  protect, getProfileByUsername);
 router.get("/:id",                 protect, getProfile);
 router.put("/profile",             protect, upload.single("avatar"), updateProfile);
 router.put("/privacy",             protect, togglePrivacy);
 router.put("/notification-settings", protect, updateNotificationSettings);
 router.put("/media-settings",        protect, updateMediaSettings);
+router.put("/bio-links",           protect, updateBioLinks);
+router.put("/profile-music",       protect, updateProfileMusic);
+router.put("/profile-theme",       protect, updateProfileTheme);
+router.put("/word-filter",         protect, updateWordFilter);
+router.post("/streak/checkin",     protect, checkInStreak);
+router.post("/referral/use",       protect, useReferral);
 router.post("/:id/follow",         protect, followUser);
 router.post("/:id/block",          protect, blockUser);
 router.post("/:id/accept-follow",  protect, acceptFollow);
 router.post("/:id/reject-follow",  protect, rejectFollow);
+router.post("/:id/close-friend",   protect, toggleCloseFriend);
 
 module.exports = router;

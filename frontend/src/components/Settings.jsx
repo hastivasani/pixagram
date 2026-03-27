@@ -3,7 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { HiChevronRight, HiArrowLeft } from "react-icons/hi";
 import { useTheme } from "../Context/ThemeContext";
 import { useAuth } from "../Context/AuthContext";
-import { updateProfile, changePassword, deleteAccount, togglePrivacy, getBlockedUsers, blockUser, updateNotificationSettings, updateMediaSettings } from "../services/api";
+import {
+  updateProfile, changePassword, deleteAccount, togglePrivacy,
+  getBlockedUsers, blockUser, updateNotificationSettings, updateMediaSettings,
+  updateBioLinks, updateProfileMusic, updateProfileTheme, updateWordFilter,
+  getLoginActivity,
+} from "../services/api";
 
 /* ── Reusable sub-components ─────────────────────────────────── */
 const inputCls = "w-full px-3 py-2.5 border border-theme rounded-xl bg-theme-input text-theme-primary focus:ring-2 focus:ring-blue-500 outline-none text-sm";
@@ -59,11 +64,22 @@ export default function Settings() {
     comments:       user?.notificationSettings?.comments       ?? true,
     followRequests: user?.notificationSettings?.followRequests ?? true,
     messages:       user?.notificationSettings?.messages       ?? true,
+    streakReminder: user?.notificationSettings?.streakReminder ?? true,
+    dailyChallenge: user?.notificationSettings?.dailyChallenge ?? true,
   });
   const [mediaSettings, setMediaSettings] = useState({
     autoplayVideos: user?.mediaSettings?.autoplayVideos ?? true,
     hdUploads:      user?.mediaSettings?.hdUploads      ?? true,
   });
+
+  // New state for new features
+  const [profileColor,  setProfileColor]  = useState(user?.profileColor  || "#a855f7");
+  const [profileTheme,  setProfileTheme]  = useState(user?.profileTheme  || "default");
+  const [profileMusic,  setProfileMusic]  = useState(user?.profileMusic  || "");
+  const [profileMusicName, setProfileMusicName] = useState(user?.profileMusicName || "");
+  const [wordFilter,    setWordFilter]    = useState((user?.wordFilter || []).join(", "));
+  const [loginActivity, setLoginActivity] = useState([]);
+  const [bioLinks,      setBioLinks]      = useState(user?.bioLinks || []);
 
   useEffect(() => {
     if (user) {
@@ -78,6 +94,9 @@ export default function Settings() {
   useEffect(() => {
     if (activeSection === "blocked") {
       getBlockedUsers().then(r => setBlocked(r.data)).catch(() => {});
+    }
+    if (activeSection === "login-activity") {
+      getLoginActivity().then(r => setLoginActivity(r.data)).catch(() => {});
     }
   }, [activeSection]);
 
@@ -158,8 +177,20 @@ export default function Settings() {
         { key: "edit-profile",    label: "Edit profile" },
         { key: "change-password", label: "Change password" },
         { key: "account-privacy", label: "Account privacy" },
+        { key: "close-friends",   label: "Close Friends" },
         { key: "blocked",         label: "Blocked accounts" },
         { key: "notifications",   label: "Notifications" },
+        { key: "login-activity",  label: "Login Activity" },
+        { key: "word-filter",     label: "Word Filter" },
+      ],
+    },
+    {
+      group: "Profile",
+      items: [
+        { key: "profile-theme",   label: "Profile Theme & Color" },
+        { key: "profile-music",   label: "Profile Music" },
+        { key: "bio-links",       label: "Bio Links", action: () => navigate("/bio-links") },
+        { key: "analytics",       label: "Creator Analytics", action: () => navigate("/analytics") },
       ],
     },
     {
@@ -287,10 +318,12 @@ export default function Settings() {
       case "notifications": return (
         <div>
           {[
-            ["postLikes",      "Post likes",      "When someone likes your post"],
-            ["comments",       "Comments",        "When someone comments on your post"],
-            ["followRequests", "Follow requests", "When someone sends a follow request"],
-            ["messages",       "Messages",        "When you receive a new message"],
+            ["postLikes",      "Post likes",       "When someone likes your post"],
+            ["comments",       "Comments",         "When someone comments on your post"],
+            ["followRequests", "Follow requests",  "When someone sends a follow request"],
+            ["messages",       "Messages",         "When you receive a new message"],
+            ["streakReminder", "Streak Reminder",  "Daily reminder to keep your streak"],
+            ["dailyChallenge", "Daily Challenge",  "Reminder for gaming daily challenge"],
           ].map(([key, lbl, desc]) => (
             <Row key={key} label={lbl} desc={desc} right={<Toggle value={notifSettings[key]} onChange={() => handleNotifToggle(key)} />} />
           ))}
@@ -344,7 +377,109 @@ export default function Settings() {
         </div>
       );
 
-      default: return <p className="px-4 py-6 text-sm text-theme-muted">Coming soon.</p>;
+      case "login-activity": return (
+        <div className="px-4 py-4 space-y-3">
+          <p className="text-xs text-theme-muted">Recent login sessions (last 20)</p>
+          {loginActivity.length === 0 && <p className="text-sm text-theme-muted text-center py-6">No activity recorded</p>}
+          {loginActivity.map((a, i) => (
+            <div key={i} className={`bg-theme-card rounded-xl p-3 border ${a.success ? "border-theme" : "border-red-500/30"}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-xs font-bold ${a.success ? "text-green-400" : "text-red-400"}`}>{a.success ? "✓ Success" : "✗ Failed"}</span>
+                <span className="text-xs text-theme-muted">{new Date(a.loginAt).toLocaleString()}</span>
+              </div>
+              <p className="text-xs text-theme-secondary truncate">{a.device || "Unknown device"}</p>
+              <p className="text-xs text-theme-muted">{a.ip || "Unknown IP"}</p>
+            </div>
+          ))}
+        </div>
+      );
+
+      case "word-filter": return (
+        <div className="px-4 py-4 space-y-3">
+          <p className="text-xs text-theme-muted">Comments containing these words will be hidden. Separate with commas.</p>
+          <textarea rows={4} value={wordFilter} onChange={e => setWordFilter(e.target.value)}
+            placeholder="spam, hate, offensive..."
+            className={inputCls + " resize-none"}/>
+          <button onClick={async () => {
+            const words = wordFilter.split(",").map(w => w.trim()).filter(Boolean);
+            try { await updateWordFilter(words); showMsg("Word filter updated"); } catch (_) { showMsg("Failed", true); }
+          }} className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold text-sm transition">
+            Save Filter
+          </button>
+        </div>
+      );
+
+      case "close-friends": return (
+        <div className="px-4 py-4">
+          <p className="text-xs text-theme-muted mb-3">Close friends can see your exclusive stories. Manage from your profile page.</p>
+          <button onClick={() => navigate("/profile")} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold text-sm transition">
+            Go to Profile
+          </button>
+        </div>
+      );
+
+      case "profile-theme": return (
+        <div className="px-4 py-4 space-y-4">
+          <MsgBanner/>
+          <div>
+            <label className="block text-xs font-semibold text-theme-muted mb-2 uppercase tracking-wide">Profile Color</label>
+            <div className="flex gap-2 flex-wrap">
+              {["#a855f7","#3b82f6","#ef4444","#22c55e","#f59e0b","#ec4899","#14b8a6","#f97316"].map(c => (
+                <button key={c} onClick={() => setProfileColor(c)}
+                  className={`w-10 h-10 rounded-full border-4 transition ${profileColor === c ? "border-white scale-110" : "border-transparent"}`}
+                  style={{ backgroundColor: c }}/>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-theme-muted mb-2 uppercase tracking-wide">Profile Theme</label>
+            <div className="grid grid-cols-3 gap-2">
+              {["default","minimal","gradient","neon","retro","glass"].map(t => (
+                <button key={t} onClick={() => setProfileTheme(t)}
+                  className={`py-2 rounded-xl text-xs font-semibold capitalize transition border-2 ${profileTheme === t ? "border-purple-500 bg-purple-500/20 text-purple-400" : "border-theme bg-theme-input text-theme-muted"}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button onClick={async () => {
+            try { await updateProfileTheme({ profileTheme, profileColor }); await refreshUser(); showMsg("Theme updated"); }
+            catch (_) { showMsg("Failed", true); }
+          }} className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition">
+            Save Theme
+          </button>
+        </div>
+      );
+
+      case "profile-music": return (
+        <div className="px-4 py-4 space-y-3">
+          <MsgBanner/>
+          <p className="text-xs text-theme-muted">Add a music URL that plays on your profile (MP3/audio link).</p>
+          <div>
+            <label className="block text-xs font-semibold text-theme-muted mb-1 uppercase tracking-wide">Song Name</label>
+            <input value={profileMusicName} onChange={e => setProfileMusicName(e.target.value)} placeholder="e.g. Blinding Lights" className={inputCls}/>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-theme-muted mb-1 uppercase tracking-wide">Audio URL</label>
+            <input value={profileMusic} onChange={e => setProfileMusic(e.target.value)} placeholder="https://..." className={inputCls}/>
+          </div>
+          {profileMusic && (
+            <audio controls src={profileMusic} className="w-full rounded-xl"/>
+          )}
+          <button onClick={async () => {
+            try { await updateProfileMusic({ profileMusic, profileMusicName }); await refreshUser(); showMsg("Music updated"); }
+            catch (_) { showMsg("Failed", true); }
+          }} className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition">
+            Save Music
+          </button>
+          {profileMusic && (
+            <button onClick={async () => {
+              try { await updateProfileMusic({ profileMusic: "", profileMusicName: "" }); setProfileMusic(""); setProfileMusicName(""); await refreshUser(); showMsg("Music removed"); }
+              catch (_) {}
+            }} className="w-full py-2 text-sm text-red-400 hover:text-red-300 transition">Remove Music</button>
+          )}
+        </div>
+      );
     }
   };
 

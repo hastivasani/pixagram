@@ -20,15 +20,17 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Connect socket when user is available
+  // Connect socket when user is available, disconnect only on logout/unmount
   useEffect(() => {
     if (user?._id) {
       getSocket(user._id);
     }
-    return () => {
-      if (!user) disconnectSocket();
-    };
   }, [user?._id]);
+
+  // Disconnect socket only when component unmounts (app closes)
+  useEffect(() => {
+    return () => { disconnectSocket(); };
+  }, []);
 
   const login = (token, userData) => {
     localStorage.setItem("token", token);
@@ -58,7 +60,7 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;

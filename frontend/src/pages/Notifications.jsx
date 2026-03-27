@@ -48,8 +48,15 @@ export default function NotificationsPanel({ open, setOpen }) {
     try {
       await acceptFollow(senderId);
       setLocalState((prev) => ({ ...prev, [notifId]: "accepted" }));
-      await refreshUser(); // update user.followers in context
-    } catch (err) { console.error(err); }
+      await refreshUser();
+    } catch (err) {
+      // Stale notification — treat as already accepted
+      if (err?.response?.status === 400) {
+        setLocalState((prev) => ({ ...prev, [notifId]: "accepted" }));
+      } else {
+        console.error(err);
+      }
+    }
   };
 
   const handleReject = async (senderId, notifId) => {

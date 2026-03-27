@@ -1,10 +1,8 @@
 import { io } from "socket.io-client";
 
-// Always connect to same origin — Vite proxy will forward to backend
-// This avoids mixed-content (ws:// on https://) errors
-const SOCKET_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace("/api", "")
-  : window.location.origin;
+// Always use window.location.origin so Vite proxy forwards /socket.io → backend
+// This works for both localhost AND 192.168.x.x access
+const SOCKET_URL = window.location.origin;
 
 let socket = null;
 let currentUserId = null;

@@ -20,6 +20,7 @@ import {
   HiOutlineStar, HiStar,
   HiCamera,
 } from "react-icons/hi";
+import { FaGamepad, FaUsers, FaHeadphones, FaTwitter, FaShoppingBag, FaCalendarAlt, FaVideo } from "react-icons/fa";
 
 // Desktop sidebar shows all items
 const ALL_NAV = [
@@ -27,13 +28,28 @@ const ALL_NAV = [
   { to: "/reels",         label: "Reels",          icon: HiOutlineVideoCamera,    activeIcon: HiVideoCamera },
   { to: "/camera",        label: "Camera",         icon: HiCamera,                activeIcon: HiCamera },
   { to: "/messages",      label: "Messages",       icon: HiOutlineChat,           activeIcon: HiChat },
+  { to: "/groups",        label: "Groups",         icon: FaUsers,                 activeIcon: FaUsers },
+  { to: "/twitter",       label: "Twitter",        icon: FaTwitter,               activeIcon: FaTwitter },
   { to: "/search",        label: "Search",         icon: HiOutlineSearch,         activeIcon: HiSearch },
   { to: "/explore",       label: "Explore",        icon: HiOutlineGlobe,          activeIcon: HiGlobe },
+  { to: "/gaming",        label: "Gaming",         icon: FaGamepad,               activeIcon: FaGamepad },
+  { to: "/shop",          label: "Shop",           icon: FaShoppingBag,           activeIcon: FaShoppingBag },
+  { to: "/booking",       label: "Booking",        icon: FaCalendarAlt,           activeIcon: FaCalendarAlt },
+  { to: "/video",         label: "Videos",         icon: FaVideo,                 activeIcon: FaVideo },
   { to: "/notifications", label: "Notifications",  icon: HiOutlineBell,           activeIcon: HiBell },
   { to: "/create",        label: "Create",         icon: HiOutlinePlusCircle,     activeIcon: HiPlusCircle },
   { to: "/profile",       label: "Profile",        icon: HiOutlineUserCircle,     activeIcon: HiUserCircle },
   { to: "/more",          label: "More",           icon: HiOutlineDotsHorizontal, activeIcon: HiDotsHorizontal },
   { to: "/meta",          label: "Also from Meta", icon: HiOutlineStar,           activeIcon: HiStar },
+];
+
+// Mobile bottom nav shows only 5 key items
+const MOBILE_NAV = [
+  { to: "/",              label: "Home",          icon: HiOutlineHome,           activeIcon: HiHome },
+  { to: "/search",        label: "Search",        icon: HiOutlineSearch,         activeIcon: HiSearch },
+  { to: "/reels",         label: "Reels",         icon: HiOutlineVideoCamera,    activeIcon: HiVideoCamera },
+  { to: "/notifications", label: "Alerts",        icon: HiOutlineBell,           activeIcon: HiBell },
+  { to: "/more",          label: "More",          icon: HiOutlineDotsHorizontal, activeIcon: HiDotsHorizontal },
 ];
 
 export default function Sidebar() {
@@ -102,17 +118,14 @@ export default function Sidebar() {
                     </>
                   )}
                 </NavLink>
-                {/* Tooltip */}
-                <span className="absolute left-full ml-3 px-2.5 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-lg">
-                  {item.label}
-                </span>
+
               </div>
             </React.Fragment>
           ))}
         </nav>
 
         {/* Avatar */}
-        <div className="relative group mt-2 flex-shrink-0">
+        <div className="relative mt-2 flex-shrink-0">
           <div className="w-9 h-9 rounded-full ring-2 ring-purple-400 overflow-hidden cursor-pointer">
             {user.avatar
               ? <img src={user.avatar} alt="me" className="w-full h-full object-cover" />
@@ -121,22 +134,19 @@ export default function Sidebar() {
                 </div>
             }
           </div>
-          <span className="absolute left-full ml-3 px-2.5 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-            {user.username}
-          </span>
         </div>
       </div>
 
       {/* ── Mobile bottom nav (< md) ──────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 bg-theme-sidebar border-t border-theme z-40 md:hidden safe-bottom">
-        <div className="flex items-center overflow-x-auto scrollbar-hide px-1 py-1 gap-0">
-          {ALL_NAV.map((item) => (
+        <div className="flex items-center px-2 py-1">
+          {MOBILE_NAV.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={(e) => handleClick(e, item.label)}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center flex-shrink-0 w-[14.28%] min-w-[52px] py-1.5 transition-colors ${
+                `flex flex-col items-center justify-center flex-1 py-2 transition-colors ${
                   isActive ? "text-purple-500" : "text-theme-secondary"
                 }`
               }
@@ -144,16 +154,14 @@ export default function Sidebar() {
               {({ isActive }) => (
                 <>
                   <div className="relative">
-                    {isActive ? <item.activeIcon size={20} /> : <item.icon size={20} />}
-                    {item.label === "Notifications" && unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center font-bold leading-none">
+                    {isActive ? <item.activeIcon size={22} /> : <item.icon size={22} />}
+                    {item.label === "Alerts" && unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center font-bold leading-none">
                         {unreadCount > 9 ? "9+" : unreadCount}
                       </span>
                     )}
                   </div>
-                  <span className="text-[9px] mt-0.5 leading-none truncate w-full text-center px-0.5">
-                    {item.label === "Also from Meta" ? "Meta" : item.label}
-                  </span>
+                  <span className="text-[10px] mt-0.5 leading-none">{item.label}</span>
                 </>
               )}
             </NavLink>

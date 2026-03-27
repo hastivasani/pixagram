@@ -1,8 +1,55 @@
-﻿import { useEffect } from "react";
+﻿import { useEffect, useState } from "react";
 import Status from "../components/Status";
 import PostCard from "../components/PostCard";
 import SuggestedUsers from "../components/SuggestedUsers";
 import { useContent } from "../Context/ContentContext";
+import { useAuth } from "../Context/AuthContext";
+import { checkInStreak } from "../services/api";
+
+function StreakBanner() {
+  const { user, refreshUser } = useAuth();
+  const [msg, setMsg]     = useState("");
+  const [done, setDone]   = useState(false);
+  const streak = user?.streak;
+
+  // Auto check-in on mount
+  useEffect(() => {
+    if (!user) return;
+    const last = streak?.lastLogin ? new Date(streak.lastLogin) : null;
+    const today = new Date().toDateString();
+    if (last && last.toDateString() === today) { setDone(true); return; }
+    checkInStreak().then(r => {
+      if (!r.data.alreadyCheckedIn) {
+        setMsg(`🔥 Day ${r.data.streak.current} streak! +${r.data.xpGained} XP`);
+        refreshUser?.();
+        setTimeout(() => setMsg(""), 5000);
+      } else { setDone(true); }
+    }).catch(() => {});
+  }, []);
+
+  if (!msg && !streak?.current) return null;
+
+  return (
+    <div className="mx-4 mt-3 bg-gradient-to-r from-orange-500/20 to-red-500/20 rounded-2xl px-4 py-3 border border-orange-500/30 flex items-center gap-3">
+      <span className="text-2xl">🔥</span>
+      <div className="flex-1">
+        {msg ? (
+          <p className="text-sm font-bold text-orange-400">{msg}</p>
+        ) : (
+          <>
+            <p className="text-sm font-bold text-theme-primary">{streak?.current || 0} Day Streak</p>
+            <p className="text-xs text-theme-muted">Level {user?.xpLevel?.level || 1} · {user?.xpLevel?.total || 0} XP</p>
+          </>
+        )}
+      </div>
+      {(user?.badges?.length > 0) && (
+        <div className="flex gap-1">
+          {user.badges.slice(-3).map((b, i) => <span key={i} title={b.name} className="text-lg">{b.icon}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Home() {
   const { posts, loadingPosts, hasMore, fetchFeed, fetchStories, loadMoreFeed } = useContent();
@@ -19,6 +66,7 @@ export default function Home() {
       <div className="w-full border-b border-theme bg-theme-primary">
         <Status />
       </div>
+      <StreakBanner/>
 
       {/* Main layout: feed + right sidebar */}
       <div className="w-full max-w-[1400px] mx-auto px-0 sm:px-4 lg:px-6 xl:px-8">

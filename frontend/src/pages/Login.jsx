@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { loginUser } from "../services/api";
 import { useAuth } from "../Context/AuthContext";
 
@@ -68,6 +68,10 @@ export default function Login() {
           >
             {loading ? "Logging in..." : "Log in"}
           </button>
+
+          <div className="text-center mb-4">
+            <Link to="/forgot-password" className="text-sm text-blue-400 hover:text-blue-300">Forgot password?</Link>
+          </div>
 
           <button
             onClick={() => navigate("/register")}

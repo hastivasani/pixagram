@@ -104,8 +104,27 @@ exports.acceptFollow = async (req, res) => {
     const senderId = req.params.id;
     const me       = await User.findById(req.user._id);
 
-    const isPending = me.followRequests.map(String).includes(senderId);
-    if (!isPending) return res.status(400).json({ message: "No pending request from this user" });
+    const pendingIds  = me.followRequests.map(String);
+    const followerIds = me.followers.map(String);
+    const isPending       = pendingIds.includes(senderId);
+    const alreadyFollower = followerIds.includes(senderId);
+
+    console.log(`[acceptFollow] me=${req.user._id} sender=${senderId}`);
+    console.log(`[acceptFollow] followRequests=${JSON.stringify(pendingIds)}`);
+    console.log(`[acceptFollow] isPending=${isPending} alreadyFollower=${alreadyFollower}`);
+
+    // Idempotent: already a follower → success
+    if (!isPending && alreadyFollower) {
+      return res.json({ message: "Already following" });
+    }
+
+    // Neither pending nor follower — the notification is stale/orphaned
+    // Accept gracefully: add them as follower anyway
+    if (!isPending && !alreadyFollower) {
+      await User.findByIdAndUpdate(req.user._id, { $addToSet: { followers: senderId } });
+      await User.findByIdAndUpdate(senderId, { $addToSet: { following: req.user._id } });
+      return res.json({ message: "Follow accepted" });
+    }
 
     // Move from requests → followers/following
     await User.findByIdAndUpdate(req.user._id, {
@@ -285,4 +304,182 @@ exports.updateMediaSettings = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+};
+
+// ── Close Friends ─────────────────────────────────────────────
+exports.toggleCloseFriend = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    const targetId = req.params.id;
+    const isClose = user.closeFriends?.map(String).includes(targetId);
+    if (isClose) {
+      await User.findByIdAndUpdate(req.user._id, { $pull: { closeFriends: targetId } });
+    } else {
+      await User.findByIdAndUpdate(req.user._id, { $addToSet: { closeFriends: targetId } });
+    }
+    res.json({ isCloseFriend: !isClose });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+exports.getCloseFriends = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate("closeFriends", "username name avatar");
+    res.json(user.closeFriends || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+// ── Daily Login Streak ────────────────────────────────────────
+exports.checkInStreak = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    const now = new Date();
+    const last = user.streak?.lastLogin ? new Date(user.streak.lastLogin) : null;
+    const diffDays = last ? Math.floor((now - last) / (1000 * 60 * 60 * 24)) : 999;
+
+    let current = user.streak?.current || 0;
+    let longest = user.streak?.longest || 0;
+    let xpGained = 0;
+
+    if (diffDays === 0) return res.json({ alreadyCheckedIn: true, streak: user.streak });
+    if (diffDays === 1) { current++; xpGained = 10 + current * 2; }
+    else { current = 1; xpGained = 10; }
+    if (current > longest) longest = current;
+
+    const newXp = (user.xpLevel?.total || 0) + xpGained;
+    const newLevel = Math.floor(newXp / 100) + 1;
+
+    await User.findByIdAndUpdate(req.user._id, {
+      "streak.current": current,
+      "streak.longest": longest,
+      "streak.lastLogin": now,
+      "xpLevel.total": newXp,
+      "xpLevel.level": newLevel,
+      "xpLevel.nextLevelXp": newLevel * 100,
+    });
+
+    // Check badge unlocks
+    const badges = [];
+    if (current === 7)  badges.push({ name: "Week Warrior",  icon: "🔥", desc: "7-day streak!" });
+    if (current === 30) badges.push({ name: "Month Master",  icon: "💎", desc: "30-day streak!" });
+    if (current === 100) badges.push({ name: "Century Club", icon: "👑", desc: "100-day streak!" });
+    if (badges.length) {
+      await User.findByIdAndUpdate(req.user._id, { $push: { badges: { $each: badges } } });
+    }
+
+    res.json({ streak: { current, longest, lastLogin: now }, xpGained, newLevel, badges });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+// ── Referral ──────────────────────────────────────────────────
+exports.generateReferral = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user.referralCode) {
+      const code = user.username.toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+      await User.findByIdAndUpdate(req.user._id, { referralCode: code });
+      return res.json({ referralCode: code });
+    }
+    res.json({ referralCode: user.referralCode });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+exports.useReferral = async (req, res) => {
+  try {
+    const { code } = req.body;
+    const referrer = await User.findOne({ referralCode: code });
+    if (!referrer) return res.status(404).json({ message: "Invalid referral code" });
+    if (String(referrer._id) === String(req.user._id)) return res.status(400).json({ message: "Cannot use own code" });
+
+    const me = await User.findById(req.user._id);
+    if (me.referredBy) return res.status(400).json({ message: "Already used a referral" });
+
+    await User.findByIdAndUpdate(req.user._id, { referredBy: referrer._id, $inc: { "xpLevel.total": 50 } });
+    await User.findByIdAndUpdate(referrer._id, { $inc: { referralCount: 1, "xpLevel.total": 100 } });
+
+    res.json({ message: "Referral applied! +50 XP for you, +100 XP for referrer" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+// ── Creator Analytics ─────────────────────────────────────────
+exports.getCreatorAnalytics = async (req, res) => {
+  try {
+    const Post = require("../models/Post");
+    const userId = req.user._id;
+    const posts = await Post.find({ user: userId, isPublished: true });
+    const totalLikes    = posts.reduce((a, p) => a + (p.likes?.length || 0), 0);
+    const totalComments = posts.reduce((a, p) => a + (p.comments?.length || 0), 0);
+    const totalReposts  = posts.reduce((a, p) => a + (p.reposts?.length || 0), 0);
+    const totalSaves    = posts.reduce((a, p) => a + (p.saves?.length || 0), 0);
+    const user = await User.findById(userId).select("followers creatorAnalytics xpLevel streak badges");
+
+    // Weekly posts
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const weeklyPosts = posts.filter(p => new Date(p.createdAt) > weekAgo).length;
+
+    res.json({
+      totalPosts: posts.length,
+      totalLikes,
+      totalComments,
+      totalReposts,
+      totalSaves,
+      totalFollowers: user.followers?.length || 0,
+      weeklyPosts,
+      xpLevel: user.xpLevel,
+      streak: user.streak,
+      badges: user.badges,
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+// ── Login Activity ────────────────────────────────────────────
+exports.getLoginActivity = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("loginActivity");
+    res.json(user.loginActivity?.slice(-20).reverse() || []);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+// ── Bio Links ─────────────────────────────────────────────────
+exports.updateBioLinks = async (req, res) => {
+  try {
+    const { bioLinks } = req.body;
+    const user = await User.findByIdAndUpdate(req.user._id, { bioLinks }, { new: true }).select("bioLinks");
+    res.json(user.bioLinks);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+// ── Profile Music ─────────────────────────────────────────────
+exports.updateProfileMusic = async (req, res) => {
+  try {
+    const { profileMusic, profileMusicName } = req.body;
+    const user = await User.findByIdAndUpdate(req.user._id, { profileMusic, profileMusicName }, { new: true }).select("profileMusic profileMusicName");
+    res.json(user);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+// ── Profile Theme/Color ───────────────────────────────────────
+exports.updateProfileTheme = async (req, res) => {
+  try {
+    const { profileTheme, profileColor } = req.body;
+    const user = await User.findByIdAndUpdate(req.user._id, { profileTheme, profileColor }, { new: true }).select("profileTheme profileColor");
+    res.json(user);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+// ── Word Filter ───────────────────────────────────────────────
+exports.updateWordFilter = async (req, res) => {
+  try {
+    const { wordFilter } = req.body;
+    const user = await User.findByIdAndUpdate(req.user._id, { wordFilter }, { new: true }).select("wordFilter");
+    res.json(user.wordFilter);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+};
+
+// ── Save Post ─────────────────────────────────────────────────
+exports.getSavedPosts = async (req, res) => {
+  try {
+    const Post = require("../models/Post");
+    const posts = await Post.find({ saves: req.user._id }).populate("user", "username avatar").sort({ createdAt: -1 });
+    res.json(posts);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 };

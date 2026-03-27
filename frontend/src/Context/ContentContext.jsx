@@ -17,8 +17,8 @@ export function ContentProvider({ children }) {
   const fetchFeed = useCallback(async (page = 1) => {
     try {
       setLoadingPosts(true);
-      const res = await getFeed(page);
-      // handle both old array response and new { posts, hasMore } shape
+      // excludeTwitter=true — show all posts except twitter source
+      const res = await getFeed(page, false, true);
       const data    = res.data?.posts ?? res.data;
       const more    = res.data?.hasMore ?? false;
       const sorted  = [...data].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -92,6 +92,8 @@ export function ContentProvider({ children }) {
     const socket = getSocket(user._id);
 
     const onNewPost = (post) => {
+      // Only show non-twitter posts on home feed
+      if (post?.source === "twitter") return;
       setPosts((prev) => {
         if (prev.some((p) => p._id === post._id)) return prev;
         return [post, ...prev];
